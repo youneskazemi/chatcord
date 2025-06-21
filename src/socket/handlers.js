@@ -332,7 +332,7 @@ function registerSocketHandlers(io, socket) {
       if (!userSession) return;
 
       const conversations = await getUserDMConversations(userSession.id);
-      socket.emit("dmConversations", conversations);
+      socket.emit("dmConversationsList", conversations);
     } catch (error) {
       console.error("Error fetching DM conversations:", error);
     }
