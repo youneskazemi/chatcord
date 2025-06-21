@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ChatCord - Discord Clone</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
+</head>
+<body>
+    <div class="connection-status" id="connectionStatus">
+        Connecting to server...
+    </div>
+
+    <div class="app">
+        <div class="sidebar" id="sidebar">
+            <div class="server-header">
+                <button class="mobile-toggle" id="mobileToggle">☰</button>
+                <span class="server-icon">🎮</span> ChatCord
+                <button class="theme-toggle" id="themeToggle">🌙</button>
+            </div>
+            <div class="channels">
+                <div class="channel-category">
+                    Text Channels
+                    <span class="channel-count">5</span>
+                </div>
+                <div class="channel active" data-channel="general">
+                    <span class="channel-icon">#</span>
+                    general
+                    <div class="voice-controls">
+                        <button class="voice-btn" onclick="joinVoiceChannel('general')" title="Join Voice">🔊</button>
+                    </div>
+                </div>
+                <div class="channel" data-channel="random">
+                    <span class="channel-icon">#</span>
+                    random
+                    <div class="voice-controls">
+                        <button class="voice-btn" onclick="joinVoiceChannel('random')" title="Join Voice">🔊</button>
+                    </div>
+                </div>
+                <div class="channel" data-channel="gaming">
+                    <span class="channel-icon">#</span>
+                    gaming
+                    <div class="voice-controls">
+                        <button class="voice-btn" onclick="joinVoiceChannel('gaming')" title="Join Voice">🔊</button>
+                    </div>
+                </div>
+                <div class="channel" data-channel="music">
+                    <span class="channel-icon">#</span>
+                    music
+                    <div class="voice-controls">
+                        <button class="voice-btn" onclick="joinVoiceChannel('music')" title="Join Voice">🔊</button>
+                    </div>
+                </div>
+                <div class="channel" data-channel="coding">
+                    <span class="channel-icon">#</span>
+                    coding
+                    <div class="voice-controls">
+                        <button class="voice-btn" onclick="joinVoiceChannel('coding')" title="Join Voice">🔊</button>
+                    </div>
+                </div>
+                
+                <div class="channel-category">
+                    Direct Messages
+                    <button class="add-dm-btn" id="newDmBtn" title="New Message">+</button>
+                </div>
+                <div id="dmList">
+                    <!-- DM conversations will be added here dynamically -->
+                </div>
+            </div>
+            <div class="user-area">
+                <div class="user-avatar-container">
+                    <div class="user-avatar" id="currentUserAvatar">U</div>
+                    <div class="online-indicator"></div>
+                </div>
+                <div class="user-info">
+                    <div class="username" id="currentUsername">User</div>
+                    <div class="user-status" id="userStatus">Online</div>
+                </div>
+                <div class="voice-controls-user">
+                    <button class="voice-btn" id="muteBtn" onclick="toggleMute()" title="Mute">🎤</button>
+                    <button class="voice-btn" id="deafenBtn" onclick="toggleDeafen()" title="Deafen">🔊</button>
+                    <button class="voice-btn" id="leaveVoiceBtn" onclick="leaveVoiceChannel()" title="Leave Voice" style="display: none;">📞</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="chat-header">
+                <div class="channel-info">
+                    <span class="channel-icon" id="currentChannelIcon">#</span>
+                    <span class="channel-name" id="currentChannelName">general</span>
+                </div>
+                <div class="voice-status" id="voiceStatus" style="display: none;">
+                    <div class="voice-indicator"></div>
+                    <span>Voice Connected</span>
+                    <div class="voice-participants" id="voiceParticipantsCount">1</div>
+                </div>
+            </div>
+            
+            <div class="chat-messages" id="chatMessages">
+                <!-- Messages will be populated here -->
+            </div>
+            
+            <div class="typing-indicator" id="typingIndicator">
+                <span id="typingText">Someone is typing...</span>
+            </div>
+            
+            <div class="chat-input-container">
+                <textarea 
+                    class="chat-input" 
+                    id="messageInput" 
+                    placeholder="Message #general" 
+                    rows="1"
+                    maxlength="2000"
+                ></textarea>
+                <div class="chat-input-actions">
+                    <button class="emoji-button" id="emojiButton" title="Add emoji">😊</button>
+                </div>
+            </div>
+            
+            <!-- Improved emoji picker -->
+            <div class="emoji-picker" id="emojiPicker">
+                <input type="text" class="emoji-search" id="emojiSearch" placeholder="Search emojis...">
+                <div class="emoji-categories">
+                    <div class="emoji-category active" data-category="recent">🕒</div>
+                    <div class="emoji-category" data-category="smileys">😀</div>
+                    <div class="emoji-category" data-category="people">👋</div>
+                    <div class="emoji-category" data-category="animals">🐱</div>
+                    <div class="emoji-category" data-category="food">🍔</div>
+                    <div class="emoji-category" data-category="travel">✈️</div>
+                    <div class="emoji-category" data-category="activities">⚽</div>
+                    <div class="emoji-category" data-category="objects">💡</div>
+                    <div class="emoji-category" data-category="symbols">❤️</div>
+                    <div class="emoji-category" data-category="flags">🏳️</div>
+                </div>
+                <div class="emoji-container" id="emojiContainer">
+                    <!-- Emojis will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="user-list">
+            <div class="user-list-header">Online Users</div>
+            <div id="userListContainer">
+                <!-- Users will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Username Modal -->
+    <div class="username-modal" id="usernameModal">
+        <div class="modal-content">
+            <h2 class="modal-title">Welcome to ChatCord!</h2>
+            
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="loginTab">Login</button>
+                <button class="auth-tab" id="registerTab">Register</button>
+            </div>
+            
+            <div class="auth-form" id="loginForm">
+                <p class="modal-text">Welcome back! Enter your credentials to continue.</p>
+                <input 
+                    type="text" 
+                    class="modal-input" 
+                    id="loginUsername" 
+                    placeholder="Enter your username"
+                    maxlength="20"
+                >
+                <input 
+                    type="password" 
+                    class="modal-input" 
+                    id="loginPassword" 
+                    placeholder="Enter your password"
+                    maxlength="50"
+                >
+                <div class="modal-error" id="loginError" style="display: none;"></div>
+                <button class="modal-button" id="loginBtn" disabled>Login</button>
+                <p class="auth-switch">Don't have an account? <a href="#" id="switchToRegister">Register here</a></p>
+            </div>
+            
+            <div class="auth-form" id="registerForm" style="display: none;">
+                <p class="modal-text">Create a new account to start chatting with friends!</p>
+                <input 
+                    type="text" 
+                    class="modal-input" 
+                    id="registerUsername" 
+                    placeholder="Choose a username"
+                    maxlength="20"
+                >
+                <input 
+                    type="password" 
+                    class="modal-input" 
+                    id="registerPassword" 
+                    placeholder="Create a password (optional)"
+                    maxlength="50"
+                >
+                <input 
+                    type="password" 
+                    class="modal-input" 
+                    id="confirmPassword" 
+                    placeholder="Confirm password (if set)"
+                    maxlength="50"
+                >
+                <div class="modal-text" style="font-size: 12px; color: #8e9297;">
+                    💡 Setting a password protects your username and preserves your chat history
+                </div>
+                <div class="modal-error" id="registerError" style="display: none;"></div>
+                <button class="modal-button" id="registerBtn" disabled>Create Account</button>
+                <p class="auth-switch">Already have an account? <a href="#" id="switchToLogin">Login here</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- New DM Modal -->
+    <div class="modal" id="newDmModal" style="display: none;">
+        <div class="modal-content">
+            <h2 class="modal-title">New Direct Message</h2>
+            <p class="modal-text">Select a user to start a conversation</p>
+            
+            <div class="search-container">
+                <input 
+                    type="text" 
+                    class="modal-input" 
+                    id="dmUserSearch" 
+                    placeholder="Search for a user..."
+                >
+            </div>
+            
+            <div class="user-search-results" id="dmUserSearchResults">
+                <!-- Search results will be added here -->
+            </div>
+            
+            <div class="modal-actions">
+                <button class="modal-button cancel-button" id="cancelDmBtn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/script.js"></script>
+</body>
+</html>
