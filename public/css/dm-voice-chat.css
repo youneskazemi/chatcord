@@ -1,0 +1,199 @@
+ /**
+ * Direct Message Voice Chat Styles
+ */
+
+ /* Call Container - Base styles for all call UIs */
+ .dm-call-container {
+     position: fixed;
+     top: 50%;
+     left: 50%;
+     transform: translate(-50%, -50%);
+     width: 300px;
+     background-color: var(--background-primary);
+     border-radius: 8px;
+     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+     z-index: 9999;
+     overflow: hidden;
+     display: flex;
+     flex-direction: column;
+     border: 1px solid var(--background-tertiary);
+ }
+
+ /* Call Header */
+ .dm-call-header {
+     background-color: var(--background-secondary);
+     padding: 12px;
+     text-align: center;
+     border-bottom: 1px solid var(--background-tertiary);
+ }
+
+ .dm-call-header h3 {
+     margin: 0;
+     font-size: 16px;
+     font-weight: 600;
+     color: var(--text-normal);
+ }
+
+ #dm-call-duration {
+     font-size: 14px;
+     color: var(--text-muted);
+     margin-top: 4px;
+ }
+
+ /* Call Body */
+ .dm-call-body {
+     padding: 20px;
+     display: flex;
+     flex-direction: column;
+     align-items: center;
+     justify-content: center;
+ }
+
+ .dm-call-avatar {
+     width: 80px;
+     height: 80px;
+     border-radius: 50%;
+     overflow: hidden;
+     margin-bottom: 12px;
+     border: 2px solid var(--background-tertiary);
+ }
+
+ .dm-call-avatar img {
+     width: 100%;
+     height: 100%;
+     object-fit: cover;
+ }
+
+ .dm-call-user {
+     font-size: 16px;
+     font-weight: 600;
+     color: var(--text-normal);
+     margin-bottom: 8px;
+ }
+
+ .dm-call-status {
+     font-size: 14px;
+     color: var(--text-muted);
+ }
+
+ /* Call Actions */
+ .dm-call-actions {
+     padding: 16px;
+     display: flex;
+     justify-content: center;
+     gap: 12px;
+     background-color: var(--background-secondary);
+     border-top: 1px solid var(--background-tertiary);
+ }
+
+ .dm-call-btn {
+     padding: 8px 16px;
+     border-radius: 4px;
+     font-size: 14px;
+     font-weight: 500;
+     cursor: pointer;
+     display: flex;
+     align-items: center;
+     gap: 6px;
+     transition: background-color 0.2s;
+ }
+
+ .dm-call-btn i {
+     font-size: 16px;
+ }
+
+ .dm-accept-call {
+     background-color: var(--success);
+     color: white;
+     border: none;
+ }
+
+ .dm-accept-call:hover {
+     background-color: var(--success-hover, #3ba55c);
+ }
+
+ .dm-reject-call,
+ .dm-end-call {
+     background-color: var(--danger);
+     color: white;
+     border: none;
+ }
+
+ .dm-reject-call:hover,
+ .dm-end-call:hover {
+     background-color: var(--danger-hover, #d83c3e);
+ }
+
+ .dm-toggle-mute {
+     background-color: var(--background-tertiary);
+     color: var(--text-normal);
+     border: none;
+ }
+
+ .dm-toggle-mute:hover {
+     background-color: var(--background-modifier-hover);
+ }
+
+ /* Call Button in DM Header */
+ .dm-call-icon {
+     width: 36px;
+     height: 36px;
+     border-radius: 50%;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+     background-color: var(--background-tertiary);
+     color: var(--text-normal);
+     cursor: pointer;
+     transition: background-color 0.2s;
+ }
+
+ .dm-call-icon:hover {
+     background-color: var(--background-modifier-hover);
+ }
+
+ .dm-call-icon i {
+     font-size: 16px;
+ }
+
+ /* Animations */
+ @keyframes pulse {
+     0% {
+         transform: scale(1);
+     }
+
+     50% {
+         transform: scale(1.05);
+     }
+
+     100% {
+         transform: scale(1);
+     }
+ }
+
+ .dm-incoming-call-animation {
+     animation: pulse 1s infinite;
+ }
+
+ /* Responsive styles */
+ @media (max-width: 768px) {
+     .dm-call-container {
+         width: 90%;
+         max-width: 300px;
+     }
+ }
+
+ /* Dark mode support */
+ .theme-dark {
+     --success: #3ba55c;
+     --success-hover: #3d9956;
+     --danger: #ed4245;
+     --danger-hover: #d83c3e;
+ }
+
+ .theme-light {
+     --success: #3ba55c;
+     --success-hover: #3d9956;
+     --danger: #ed4245;
+     --danger-hover: #d83c3e;
+ }

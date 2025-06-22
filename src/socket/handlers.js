@@ -165,6 +165,7 @@ function registerSocketHandlers(io, socket) {
 
       // Get and send the user's DM conversations
       const dmConversations = await getUserDMConversations(user.id);
+      socket.emit("dmConversations", dmConversations);
       socket.emit("dmConversationsList", dmConversations);
 
       // Also load all users for DM search
@@ -332,6 +333,8 @@ function registerSocketHandlers(io, socket) {
       if (!userSession) return;
 
       const conversations = await getUserDMConversations(userSession.id);
+      // Emit both events for backward compatibility
+      socket.emit("dmConversations", conversations);
       socket.emit("dmConversationsList", conversations);
     } catch (error) {
       console.error("Error fetching DM conversations:", error);

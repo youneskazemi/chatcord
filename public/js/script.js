@@ -580,6 +580,44 @@ class ChatApp {
         this.toggleReaction(e.target.dataset.messageId, e.target.dataset.emoji);
       }
     });
+
+    // Voice buttons context menu
+    document.querySelectorAll(".voice-btn").forEach((btn) => {
+      btn.addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+
+        // Create context menu
+        const contextMenu = document.createElement("div");
+        contextMenu.className = "voice-context-menu";
+
+        // Add troubleshoot option
+        const troubleshootOption = document.createElement("div");
+        troubleshootOption.className = "context-menu-item";
+        troubleshootOption.textContent = "Troubleshoot Microphone";
+        troubleshootOption.addEventListener("click", () => {
+          this.troubleshootMicrophonePermissions();
+          contextMenu.remove();
+        });
+
+        contextMenu.appendChild(troubleshootOption);
+
+        // Position menu
+        contextMenu.style.top = `${e.clientY}px`;
+        contextMenu.style.left = `${e.clientX}px`;
+
+        // Add to body
+        document.body.appendChild(contextMenu);
+
+        // Remove on click outside
+        setTimeout(() => {
+          const clickHandler = () => {
+            contextMenu.remove();
+            document.removeEventListener("click", clickHandler);
+          };
+          document.addEventListener("click", clickHandler);
+        }, 0);
+      });
+    });
   }
 
   updateConnectionStatus(status, connected) {
@@ -982,7 +1020,7 @@ class ChatApp {
     chatMessages.scrollTop = chatMessages.scrollHeight;
   }
 
-  showNotification(message, type = "default") {
+  showNotification(message, type = "default", duration = 3000) {
     const notificationContainer = document.createElement("div");
     notificationContainer.className = `notification ${type}`;
     notificationContainer.textContent = message;
@@ -993,7 +1031,306 @@ class ChatApp {
       setTimeout(() => {
         notificationContainer.remove();
       }, 300);
-    }, 3000);
+    }, duration);
+  }
+
+  // Check microphone permissions
+  async checkMicrophonePermission() {
+    // First check if we're on localhost (always considered secure)
+    const isLocalhost =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
+
+    // First check if the browser supports mediaDevices API
+    if (!navigator.mediaDevices) {
+      console.error(
+        "navigator.mediaDevices is not available, trying legacy methods"
+      );
+
+      // Try legacy getUserMedia methods
+      const getUserMedia =
+        navigator.getUserMedia ||
+        navigator.webkitGetUserMedia ||
+        navigator.mozGetUserMedia;
+
+      if (!getUserMedia) {
+        // Check if using HTTP instead of HTTPS (except for localhost)
+        if (window.location.protocol === "http:" && !isLocalhost) {
+          return {
+            granted: false,
+            reason: "insecure",
+            message:
+              "Media access requires HTTPS. Please use a secure connection (HTTPS).",
+          };
+        }
+
+        return {
+          granted: false,
+          reason: "unsupported",
+          message:
+            "Your browser doesn't support accessing the microphone. Please try using Chrome, Firefox, or Edge.",
+        };
+      }
+
+      // Use legacy method with Promise wrapper
+      return new Promise((resolve) => {
+        getUserMedia.call(
+          navigator,
+          { audio: true },
+          function (stream) {
+            // Success - stop all tracks
+            stream.getTracks().forEach((track) => track.stop());
+            resolve({ granted: true });
+          },
+          function (error) {
+            console.error("Legacy getUserMedia error:", error);
+            if (
+              error.name === "PermissionDeniedError" ||
+              error.name === "NotAllowedError"
+            ) {
+              resolve({
+                granted: false,
+                reason: "denied",
+                message:
+                  "Microphone access denied. Please allow microphone access in your browser settings.",
+              });
+            } else {
+              resolve({
+                granted: false,
+                reason: "other",
+                message: `Microphone error: ${
+                  error.name || error.message || "unknown error"
+                }. Please check your settings.`,
+              });
+            }
+          }
+        );
+      });
+    }
+
+    try {
+      // Check if we can access the microphone
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // Stop all tracks immediately as we just needed to check permission
+      stream.getTracks().forEach((track) => track.stop());
+
+      return { granted: true };
+    } catch (error) {
+      console.error("Microphone permission error:", error);
+
+      if (error.name === "NotAllowedError") {
+        return {
+          granted: false,
+          reason: "denied",
+          message:
+            "Microphone access denied. Please allow microphone access in your browser settings.",
+        };
+      } else if (error.name === "NotFoundError") {
+        return {
+          granted: false,
+          reason: "notFound",
+          message:
+            "No microphone found. Please connect a microphone and try again.",
+        };
+      } else {
+        return {
+          granted: false,
+          reason: "other",
+          message: `Microphone error: ${error.message}. Please check your settings.`,
+        };
+      }
+    }
+  }
+
+  // Troubleshoot microphone permissions
+  async troubleshootMicrophonePermissions() {
+    const permissionStatus = await this.checkMicrophonePermission();
+    const browserInfo = this.detectBrowser();
+
+    let message = "";
+    let instructionsByBrowser = "";
+
+    // Get browser-specific instructions
+    if (browserInfo.browser === "Chrome") {
+      instructionsByBrowser =
+        "In Chrome, click the lock icon in the address bar and ensure microphone access is allowed.";
+    } else if (browserInfo.browser === "Firefox") {
+      instructionsByBrowser =
+        "In Firefox, click the lock icon in the address bar and select 'Allow' for microphone access.";
+    } else if (browserInfo.browser === "Safari") {
+      instructionsByBrowser =
+        "In Safari, go to Preferences > Websites > Microphone and allow access for this site.";
+    } else if (browserInfo.browser === "Edge") {
+      instructionsByBrowser =
+        "In Edge, click the lock icon in the address bar and ensure microphone access is allowed.";
+    } else if (browserInfo.browser === "Internet Explorer") {
+      instructionsByBrowser =
+        "Internet Explorer is not supported for voice chat. Please use a modern browser like Chrome, Firefox, or Edge.";
+    }
+
+    if (!permissionStatus.granted) {
+      if (permissionStatus.reason === "denied") {
+        message = `Microphone access was denied. ${instructionsByBrowser} After changing settings, refresh the page.`;
+      } else if (permissionStatus.reason === "notFound") {
+        message =
+          "No microphone was detected. Please connect a microphone to your device and try again.";
+      } else if (permissionStatus.reason === "unsupported") {
+        message = `Your browser (${browserInfo.browser} ${browserInfo.version}) doesn't support accessing the microphone. Please try using the latest version of Chrome, Firefox, or Edge.`;
+      } else if (permissionStatus.reason === "insecure") {
+        message =
+          "Media access requires HTTPS. Please use a secure connection or try accessing the site via localhost.";
+      } else {
+        message = `${permissionStatus.message} ${instructionsByBrowser}`;
+      }
+
+      // Show browser compatibility information
+      console.log(
+        `Browser detected: ${browserInfo.browser} ${browserInfo.version}`
+      );
+
+      // Create a more detailed help modal
+      const helpModal = document.createElement("div");
+      helpModal.className = "help-modal";
+      helpModal.innerHTML = `
+        <div class="help-modal-content">
+          <h3>Microphone Troubleshooting</h3>
+          <p>${message}</p>
+          
+          <div class="browser-info">
+            <h4>Your Browser</h4>
+            <p>${browserInfo.browser} ${browserInfo.version}</p>
+          </div>
+          
+          <div class="compatibility-info">
+            <h4>Compatible Browsers</h4>
+            <ul>
+              <li>Chrome 47+</li>
+              <li>Firefox 44+</li>
+              <li>Edge 79+</li>
+              <li>Safari 11+</li>
+            </ul>
+          </div>
+          
+          <button class="close-help-btn">Close</button>
+        </div>
+      `;
+
+      document.body.appendChild(helpModal);
+
+      // Add close functionality
+      helpModal
+        .querySelector(".close-help-btn")
+        .addEventListener("click", () => {
+          helpModal.remove();
+        });
+    } else {
+      message =
+        "Microphone permissions are granted. If you're still having issues, try refreshing the page or checking your device's sound settings.";
+      this.showNotification(message, "success", 5000);
+    }
+  }
+
+  // Detect browser and version
+  detectBrowser() {
+    const userAgent = navigator.userAgent;
+    let browser = "Unknown";
+    let version = "Unknown";
+
+    // Chrome
+    if (/Chrome/.test(userAgent) && !/Chromium|Edge|Edg/.test(userAgent)) {
+      browser = "Chrome";
+      version = userAgent.match(/Chrome\/(\d+\.\d+)/)?.[1] || "Unknown";
+    }
+    // Firefox
+    else if (/Firefox/.test(userAgent)) {
+      browser = "Firefox";
+      version = userAgent.match(/Firefox\/(\d+\.\d+)/)?.[1] || "Unknown";
+    }
+    // Edge (Chromium-based)
+    else if (/Edg/.test(userAgent)) {
+      browser = "Edge";
+      version = userAgent.match(/Edg\/(\d+\.\d+)/)?.[1] || "Unknown";
+    }
+    // Safari
+    else if (/Safari/.test(userAgent) && !/Chrome/.test(userAgent)) {
+      browser = "Safari";
+      version = userAgent.match(/Version\/(\d+\.\d+)/)?.[1] || "Unknown";
+    }
+    // Internet Explorer
+    else if (/MSIE|Trident/.test(userAgent)) {
+      browser = "Internet Explorer";
+      version =
+        userAgent.match(/MSIE (\d+\.\d+)/) ||
+        userAgent.match(/rv:(\d+\.\d+)/)?.[1] ||
+        "Unknown";
+    }
+
+    return { browser, version };
+  }
+
+  // Check browser compatibility
+  checkBrowserCompatibility() {
+    // Check if we're on localhost or 127.0.0.1 (these are always considered secure for WebRTC)
+    const isLocalhost =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
+
+    // For localhost, we don't need HTTPS
+    if (isLocalhost) {
+      return {
+        hasWebRTC: true,
+        isSecureContext: true,
+        isCompatible: true,
+      };
+    }
+
+    // For all other hosts, check for secure context
+    const isSecureContext =
+      window.isSecureContext === true || window.location.protocol === "https:";
+
+    return {
+      hasWebRTC: true, // Assume WebRTC is supported by default
+      isSecureContext,
+      isCompatible: isSecureContext,
+    };
+  }
+
+  // Get user media with fallback for older browsers
+  async getUserMediaWithFallback(constraints) {
+    try {
+      // Modern approach
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      }
+
+      // Legacy approach
+      const getUserMedia =
+        navigator.getUserMedia ||
+        navigator.webkitGetUserMedia ||
+        navigator.mozGetUserMedia ||
+        navigator.msGetUserMedia;
+
+      if (!getUserMedia) {
+        // Last resort: try to access the media directly
+        if (navigator.mediaDevices) {
+          return await navigator.mediaDevices.getUserMedia(constraints);
+        }
+        throw new Error("getUserMedia is not supported in this browser");
+      }
+
+      // Wrap the legacy API in a promise
+      return new Promise((resolve, reject) => {
+        try {
+          getUserMedia.call(navigator, constraints, resolve, reject);
+        } catch (err) {
+          reject(err);
+        }
+      });
+    } catch (err) {
+      console.error("Error accessing media devices:", err);
+      throw err;
+    }
   }
 
   // Voice Chat Methods
@@ -1005,16 +1342,116 @@ class ChatApp {
     try {
       console.log(`Attempting to join voice channel: ${channelName}`);
 
-      // Request audio permissions
-      this.localStream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
+      // Check if we're on localhost (always considered secure)
+      const isLocalhost =
+        window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1";
 
-      console.log("Microphone access granted:", this.localStream);
+      // Check browser compatibility first
+      const compatibility = this.checkBrowserCompatibility();
+      if (!compatibility.isCompatible && !isLocalhost) {
+        let errorMessage = "Your browser doesn't support voice chat. ";
+
+        if (!compatibility.hasWebRTC) {
+          errorMessage +=
+            "WebRTC is not supported. Please use Chrome, Firefox, or Edge.";
+        } else if (!compatibility.isSecureContext) {
+          errorMessage += "Voice chat requires a secure connection (HTTPS).";
+        }
+
+        this.showNotification(errorMessage, "error");
+        console.error("Browser compatibility issue:", compatibility);
+        return;
+      }
+
+      // First check permissions
+      const permissionStatus = await this.checkMicrophonePermission();
+      if (!permissionStatus.granted) {
+        this.showNotification(permissionStatus.message, "error");
+
+        // Show help button
+        const helpButton = document.createElement("button");
+        helpButton.className = "help-button";
+        helpButton.textContent = "Microphone Troubleshooting";
+        helpButton.onclick = () => this.troubleshootMicrophonePermissions();
+
+        // Find the voice button for this channel
+        const channelElement = document.querySelector(
+          `[data-channel="${channelName}"]`
+        );
+        if (channelElement) {
+          const voiceBtn = channelElement.querySelector(".voice-btn");
+          if (voiceBtn) {
+            // Insert help button after the voice button
+            voiceBtn.parentNode.insertBefore(helpButton, voiceBtn.nextSibling);
+
+            // Remove after 10 seconds
+            setTimeout(() => {
+              helpButton.remove();
+            }, 10000);
+          }
+        }
+        return;
+      }
+
+      // Request audio for actual use with fallback
+      try {
+        this.localStream = await this.getUserMediaWithFallback({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
+        console.log("Microphone access granted:", this.localStream);
+
+        // Check if we actually got audio tracks
+        const audioTracks = this.localStream.getAudioTracks();
+        if (audioTracks.length === 0) {
+          throw new Error("No audio tracks found in the media stream");
+        }
+
+        // Log audio track details
+        audioTracks.forEach((track) => {
+          console.log(
+            "Audio track:",
+            track.label,
+            "enabled:",
+            track.enabled,
+            "muted:",
+            track.muted
+          );
+
+          // Make sure track is enabled
+          track.enabled = true;
+
+          // Listen for track ended events
+          track.onended = () => {
+            console.log("Audio track ended:", track.label);
+            this.showNotification(
+              "Audio track ended unexpectedly. Try rejoining the voice channel.",
+              "error"
+            );
+          };
+
+          // Listen for track mute events
+          track.onmute = () => {
+            console.log("Audio track muted:", track.label);
+            if (!this.isMuted) {
+              track.enabled = true;
+            }
+          };
+        });
+      } catch (mediaError) {
+        console.error("Error getting user media:", mediaError);
+        this.showNotification(
+          `Could not access microphone: ${
+            mediaError.message || mediaError.name || "unknown error"
+          }`,
+          "error"
+        );
+        return;
+      }
 
       // Update UI and state
       this.inVoiceChat = true;
@@ -1025,6 +1462,20 @@ class ChatApp {
       document.getElementById(
         "userStatus"
       ).textContent = `In voice - ${channelName}`;
+
+      // Add troubleshoot button to voice controls
+      const voiceControls = document.getElementById("voiceControls");
+      if (voiceControls && !document.getElementById("troubleshootBtn")) {
+        const troubleshootBtn = document.createElement("button");
+        troubleshootBtn.id = "troubleshootBtn";
+        troubleshootBtn.className = "voice-control-btn";
+        troubleshootBtn.title = "Troubleshoot microphone";
+        troubleshootBtn.innerHTML = "🔍";
+        troubleshootBtn.addEventListener("click", () =>
+          this.troubleshootMicrophonePermissions()
+        );
+        voiceControls.appendChild(troubleshootBtn);
+      }
 
       // Add visual indicator to the channel
       document.querySelectorAll(".channel").forEach((channel) => {
@@ -1047,6 +1498,22 @@ class ChatApp {
         "Could not access microphone. Please check permissions.",
         "error"
       );
+
+      // Add troubleshooting button
+      const helpButton = document.createElement("button");
+      helpButton.className = "help-button";
+      helpButton.textContent = "Microphone Troubleshooting";
+      helpButton.onclick = () => this.troubleshootMicrophonePermissions();
+
+      // Add to notification area
+      const notificationArea =
+        document.getElementById("notificationArea") || document.body;
+      notificationArea.appendChild(helpButton);
+
+      // Remove after 10 seconds
+      setTimeout(() => {
+        helpButton.remove();
+      }, 10000);
     }
   }
 
@@ -1150,14 +1617,18 @@ class ChatApp {
 
     // Create peer connections for existing users
     console.log(`Creating connections for ${data.users.length} existing users`);
-    for (const user of data.users) {
-      if (user.userId !== this.currentUser.id) {
-        console.log(
-          `Initiating connection with user ${user.userId} (${user.username})`
-        );
-        await this.createPeerConnection(user.userId);
+
+    // Add a small delay to ensure all users are ready
+    setTimeout(async () => {
+      for (const user of data.users) {
+        if (user.userId !== this.currentUser.id) {
+          console.log(
+            `Initiating connection with user ${user.userId} (${user.username})`
+          );
+          await this.createPeerConnection(user.userId);
+        }
       }
-    }
+    }, 1000); // 1 second delay
   }
 
   async onUserJoinedVoice(data) {
@@ -1203,13 +1674,23 @@ class ChatApp {
       console.log(`Creating peer connection for user ${userId}`);
 
       // Create RTCPeerConnection with ICE servers
-      const pc = new RTCPeerConnection(this.rtcConfig);
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: "stun:stun.l.google.com:19302" },
+          { urls: "stun:stun1.l.google.com:19302" },
+          { urls: "stun:stun2.l.google.com:19302" },
+          { urls: "stun:stun3.l.google.com:19302" },
+          { urls: "stun:stun4.l.google.com:19302" },
+        ],
+        iceCandidatePoolSize: 10,
+      });
       this.peerConnections.set(userId, pc);
 
       // Add local stream tracks to the connection
       if (this.localStream) {
         console.log("Adding local stream tracks to connection");
         this.localStream.getTracks().forEach((track) => {
+          console.log(`Adding track to peer connection: ${track.kind}`);
           pc.addTrack(track, this.localStream);
         });
       }
@@ -1226,8 +1707,10 @@ class ChatApp {
           remoteAudio = document.createElement("audio");
           remoteAudio.id = `audio-${userId}`;
           remoteAudio.autoplay = true;
+          remoteAudio.controls = true; // Add controls for debugging
           remoteAudio.muted = this.isDeafened;
-          remoteAudio.style.display = "none";
+          remoteAudio.style.display = "block"; // Make visible for debugging
+          remoteAudio.volume = 1.0; // Ensure volume is up
           document.body.appendChild(remoteAudio);
         }
 
@@ -1235,6 +1718,18 @@ class ChatApp {
         if (remoteAudio.srcObject !== event.streams[0]) {
           remoteAudio.srcObject = event.streams[0];
           console.log("Set remote stream to audio element");
+
+          // Add event listeners for debugging
+          remoteAudio.onloadedmetadata = () => {
+            console.log("Remote audio metadata loaded, playing...");
+            remoteAudio
+              .play()
+              .catch((e) => console.error("Error playing remote audio:", e));
+          };
+
+          event.streams[0].onaddtrack = (e) => {
+            console.log("Track added to remote stream:", e.track.kind);
+          };
         }
       };
 
@@ -1282,6 +1777,8 @@ class ChatApp {
 
         // Handle ICE connection failures
         if (pc.iceConnectionState === "failed") {
+          console.log("ICE connection failed, attempting to restart");
+
           // Try using relay servers only as a fallback
           pc.getConfiguration().iceTransportPolicy = "relay";
 
@@ -1359,19 +1856,31 @@ class ChatApp {
       }
 
       // If we already have a remote description, ignore this offer
-      if (pc.remoteDescription) {
+      if (pc.remoteDescription && pc.remoteDescription.type) {
         console.log("Already have remote description, ignoring offer");
         return;
       }
 
       // Set the remote description from the offer
-      await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-      console.log("Set remote description from offer");
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
+        console.log("Set remote description from offer");
+      } catch (error) {
+        console.error("Error setting remote description:", error);
+        return;
+      }
 
       // Create and set local description (answer)
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      console.log("Created and set local answer");
+      try {
+        const answer = await pc.createAnswer({
+          offerToReceiveAudio: true,
+        });
+        await pc.setLocalDescription(answer);
+        console.log("Created and set local answer");
+      } catch (error) {
+        console.error("Error creating answer:", error);
+        return;
+      }
 
       // Send the answer back
       this.socket.emit("webrtc-answer", {
@@ -1391,9 +1900,18 @@ class ChatApp {
 
       if (pc) {
         // Only set remote description if we don't already have one
-        if (!pc.remoteDescription) {
-          await pc.setRemoteDescription(new RTCSessionDescription(data.answer));
-          console.log("Set remote description from answer");
+        if (!pc.remoteDescription || !pc.remoteDescription.type) {
+          try {
+            await pc.setRemoteDescription(
+              new RTCSessionDescription(data.answer)
+            );
+            console.log("Set remote description from answer");
+          } catch (error) {
+            console.error(
+              "Error setting remote description from answer:",
+              error
+            );
+          }
         } else {
           console.log("Already have remote description, ignoring answer");
         }
@@ -1411,14 +1929,55 @@ class ChatApp {
       const pc = this.peerConnections.get(data.fromUserId);
 
       if (pc) {
-        if (pc.remoteDescription) {
-          await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
-          console.log("Added ICE candidate");
-        } else {
-          console.log(
-            "Received ICE candidate before remote description, queueing..."
-          );
-          // In a real app, you'd queue these candidates to apply after setting the remote description
+        try {
+          if (pc.remoteDescription) {
+            await pc.addIceCandidate(new RTCIceCandidate(data.candidate));
+            console.log("Added ICE candidate");
+          } else {
+            console.log(
+              "Received ICE candidate before remote description, queueing..."
+            );
+
+            // Store the candidate to add later
+            if (!this._pendingCandidates) {
+              this._pendingCandidates = new Map();
+            }
+
+            if (!this._pendingCandidates.has(data.fromUserId)) {
+              this._pendingCandidates.set(data.fromUserId, []);
+            }
+
+            this._pendingCandidates.get(data.fromUserId).push(data.candidate);
+
+            // Set up a handler to process pending candidates once we have the remote description
+            const checkAndAddCandidates = () => {
+              if (pc.remoteDescription) {
+                const candidates =
+                  this._pendingCandidates.get(data.fromUserId) || [];
+                console.log(
+                  `Adding ${candidates.length} queued ICE candidates`
+                );
+
+                candidates.forEach(async (candidate) => {
+                  try {
+                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
+                    console.log("Added queued ICE candidate");
+                  } catch (err) {
+                    console.error("Error adding queued ICE candidate:", err);
+                  }
+                });
+
+                this._pendingCandidates.delete(data.fromUserId);
+              } else {
+                // Keep checking until we have the remote description
+                setTimeout(checkAndAddCandidates, 500);
+              }
+            };
+
+            checkAndAddCandidates();
+          }
+        } catch (error) {
+          console.error("Error adding ICE candidate:", error);
         }
       } else {
         console.error("No peer connection found for user", data.fromUserId);

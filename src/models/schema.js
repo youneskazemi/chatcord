@@ -34,169 +34,119 @@ function getUserColor(username) {
 }
 
 // Database Schema
-function initializeDatabase() {
-  return new Promise((resolve, reject) => {
-    // Enable foreign keys
-    db.run("PRAGMA foreign_keys = ON;", (err) => {
-      if (err) {
-        console.error("Error enabling foreign keys:", err);
-        return reject(err);
-      }
+async function initializeSchema() {
+  try {
+    console.log("Initializing database schema...");
 
-      // Create tables in sequence to ensure dependencies are met
-      db.serialize(() => {
-        // Users table first (no dependencies)
-        db.run(
-          `CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    email TEXT UNIQUE,
-                    password_hash TEXT,
-                    color TEXT NOT NULL,
-                    avatar_url TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    is_online BOOLEAN DEFAULT 0
-                )`,
-          (err) => {
-            if (err) console.error("Error creating users table:", err);
-          }
-        );
+    // Users table
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        email TEXT UNIQUE,
+        avatar TEXT,
+        color TEXT DEFAULT '#7289DA',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_seen TIMESTAMP,
+        socket_id TEXT,
+        status TEXT DEFAULT 'offline',
+        theme TEXT DEFAULT 'dark'
+      )
+    `);
 
-        // Channels table (no dependencies)
-        db.run(
-          `CREATE TABLE IF NOT EXISTS channels (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT UNIQUE NOT NULL,
-                    description TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    is_voice_enabled BOOLEAN DEFAULT 1
-                )`,
-          (err) => {
-            if (err) console.error("Error creating channels table:", err);
-          }
-        );
+    // Channels table
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS channels (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        type TEXT DEFAULT 'text',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_by TEXT,
+        FOREIGN KEY (created_by) REFERENCES users (id)
+      )
+    `);
 
-        // Messages table (depends on users and channels)
-        db.run(
-          `CREATE TABLE IF NOT EXISTS messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    channel_id INTEGER NOT NULL,
-                    content TEXT NOT NULL,
-                    message_type TEXT DEFAULT 'text',
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    edited_at DATETIME,
-                    is_deleted BOOLEAN DEFAULT 0,
-                    FOREIGN KEY (user_id) REFERENCES users (id),
-                    FOREIGN KEY (channel_id) REFERENCES channels (id)
-                )`,
-          (err) => {
-            if (err) console.error("Error creating messages table:", err);
-          }
-        );
+    // Messages table
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_edited BOOLEAN DEFAULT 0,
+        is_deleted BOOLEAN DEFAULT 0,
+        reactions TEXT DEFAULT '{}',
+        FOREIGN KEY (channel_id) REFERENCES channels (id),
+        FOREIGN KEY (user_id) REFERENCES users (id)
+      )
+    `);
 
-        // Message reactions table
-        db.run(
-          `CREATE TABLE IF NOT EXISTS message_reactions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    message_id INTEGER NOT NULL,
-                    user_id INTEGER NOT NULL,
-                    emoji TEXT NOT NULL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (message_id) REFERENCES messages (id),
-                    FOREIGN KEY (user_id) REFERENCES users (id),
-                    UNIQUE(message_id, user_id, emoji)
-                )`,
-          (err) => {
-            if (err)
-              console.error("Error creating message_reactions table:", err);
-          }
-        );
+    // Direct Message Conversations table
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS dm_conversations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        participants TEXT NOT NULL, -- JSON array of user IDs
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        active_call TEXT DEFAULT NULL, -- JSON object with call details
+        call_history TEXT DEFAULT '[]' -- JSON array of call history
+      )
+    `);
 
-        // User sessions table (depends on users and channels)
-        db.run(
-          `CREATE TABLE IF NOT EXISTS user_sessions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    socket_id TEXT UNIQUE NOT NULL,
-                    current_channel_id INTEGER,
-                    in_voice_chat BOOLEAN DEFAULT 0,
-                    voice_channel_id INTEGER,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users (id),
-                    FOREIGN KEY (current_channel_id) REFERENCES channels (id),
-                    FOREIGN KEY (voice_channel_id) REFERENCES channels (id)
-                )`,
-          (err) => {
-            if (err) console.error("Error creating user_sessions table:", err);
-          }
-        );
+    // Direct Messages table
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS dm_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id INTEGER NOT NULL,
+        sender_id TEXT NOT NULL,
+        content TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_edited BOOLEAN DEFAULT 0,
+        is_deleted BOOLEAN DEFAULT 0,
+        read BOOLEAN DEFAULT 0,
+        reactions TEXT DEFAULT '{}',
+        FOREIGN KEY (conversation_id) REFERENCES dm_conversations (id),
+        FOREIGN KEY (sender_id) REFERENCES users (id)
+      )
+    `);
 
-        // Direct message conversations table
-        db.run(
-          `CREATE TABLE IF NOT EXISTS dm_conversations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user1_id INTEGER NOT NULL,
-                    user2_id INTEGER NOT NULL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    last_message_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user1_id) REFERENCES users (id),
-                    FOREIGN KEY (user2_id) REFERENCES users (id),
-                    UNIQUE(user1_id, user2_id)
-                )`,
-          (err) => {
-            if (err)
-              console.error("Error creating dm_conversations table:", err);
-          }
-        );
+    // Voice Channels table
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS voice_channels (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_by TEXT,
+        FOREIGN KEY (created_by) REFERENCES users (id)
+      )
+    `);
 
-        // Direct messages table
-        db.run(
-          `CREATE TABLE IF NOT EXISTS dm_messages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    conversation_id INTEGER NOT NULL,
-                    sender_id INTEGER NOT NULL,
-                    content TEXT NOT NULL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    edited_at DATETIME,
-                    read_at DATETIME,
-                    is_deleted BOOLEAN DEFAULT 0,
-                    FOREIGN KEY (conversation_id) REFERENCES dm_conversations (id),
-                    FOREIGN KEY (sender_id) REFERENCES users (id)
-                )`,
-          (err) => {
-            if (err) console.error("Error creating dm_messages table:", err);
-          }
-        );
+    // Voice Channel Participants table
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS voice_participants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        channel_id TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_muted BOOLEAN DEFAULT 0,
+        is_deafened BOOLEAN DEFAULT 0,
+        FOREIGN KEY (channel_id) REFERENCES voice_channels (id),
+        FOREIGN KEY (user_id) REFERENCES users (id),
+        UNIQUE (channel_id, user_id)
+      )
+    `);
 
-        // DM message reactions table
-        db.run(
-          `CREATE TABLE IF NOT EXISTS dm_message_reactions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    message_id INTEGER NOT NULL,
-                    user_id INTEGER NOT NULL,
-                    emoji TEXT NOT NULL,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (message_id) REFERENCES dm_messages (id),
-                    FOREIGN KEY (user_id) REFERENCES users (id),
-                    UNIQUE(message_id, user_id, emoji)
-                )`,
-          (err) => {
-            if (err)
-              console.error("Error creating dm_message_reactions table:", err);
-          }
-        );
-
-        // Insert default data after tables are created
-        insertDefaultData(() => {
-          setInitialized();
-          console.log("Database initialized successfully.");
-          resolve();
-        });
-      });
-    });
-  });
+    console.log("Database schema initialized successfully");
+  } catch (error) {
+    console.error("Error initializing database schema:", error);
+    throw error;
+  }
 }
 
 function insertDefaultData(callback) {
@@ -322,6 +272,6 @@ function addInitialBotMessages(callback) {
 }
 
 module.exports = {
-  initializeDatabase,
+  initializeSchema,
   getUserColor,
 };

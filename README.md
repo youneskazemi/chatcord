@@ -82,6 +82,33 @@ npm run dev
 - WebRTC
 - HTML/CSS/JavaScript
 
+## Next Steps and Future Improvements
+
+### Immediate Next Steps
+
+1. **Deploy with HTTPS**: Set up a proper HTTPS environment for production to ensure WebRTC works correctly
+2. **Add Unit Tests**: Implement testing for core functionality
+3. **Improve Error Handling**: Add more robust error handling throughout the application
+
+### Future Features
+
+1. **Screen Sharing**: Add screen sharing capability to voice channels
+2. **Video Chat**: Extend voice chat to include video functionality
+3. **File Uploads**: Allow users to share files in channels and DMs
+4. **Message Threading**: Add support for threaded conversations
+5. **User Roles and Permissions**: Implement admin and moderator roles
+6. **Server/Guild System**: Allow users to create and join multiple servers
+7. **Emoji Reactions**: Expand the reaction system with custom emojis
+8. **Push Notifications**: Add support for browser notifications
+9. **Message Search**: Implement full-text search for messages
+10. **User Status**: Add custom status messages and presence indicators
+
+## Known Issues
+
+- Voice chat requires HTTPS in production environments (works on localhost without HTTPS)
+- Some browsers may require additional permissions for microphone access
+
 ## License
 
 MIT
+"3. **1-to-1 Voice Chat in DMs**: Enable private voice calls between users in direct messages" 
